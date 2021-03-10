@@ -1,73 +1,112 @@
-'''
-class User:
-    def __init__(self,name,pwd,id):
-        self.name=name
-        self.pwd=pwd
-        self.id=id
-
-class Student(User):
-    def __init__(self,pref):
-        self.pref=pref
-        assert type(self.pref) == type([]), "Unexpected type " + str(type(self.pref)) + " for pref"
-    def add_pref(self):
-        self.pref=input("enter your prefferences in order")
-    def remove_pref(self):
-        pass
-    def select_pref(self):
-        pass
-    def view_pref(self):
-        pass
-
-class Admin(User):
-    def __init__(self):
-        self.user_id="admin"
-        self.password="password"
-        self.course_data_filename = "course_data.txt"
-        self.course_file_object=open("course_data.txt","ab")
-    def add_course(self,course):
-        course.course_id=input("enter course id")
-        course.course_description=input("enter course description")
-        course.course_interes=input("enter course interests in order")
-        #add_to_pickle()
-        pickle.dump(course,self.course_file_object)
-    def remove_course(self,course_id):
-        with open("course_data.txt","wb") as self.course_file_object:
-            pass
-            
-'''
 import pickle
 
 class Course:
-    def __init__(self,course_id,interest_list,course_description):
+    def __init__(self, course_id, interest_list = [], course_description = ''):
         self.course_id=course_id
         self.interest_list=interest_list
         self.course_description=course_description
-    def compare_list(self,preferences):
-        #function to compare given preference list with course preference list
-        pass 
 
+        assert list(filter(lambda x: x is None,self.interest_list)) == [], "Cannot have None objects in course interest list"
+
+    def __eq__(self,course_obj):
+        return self.course_id == course_obj.course_id
+    
+    def compare_list(self,student_preference_list):
+        #function to compare given preference list with course preference list
+        match_count = 0
+        for pref in student_preference_list:
+            if pref in self.interest_list:
+                match_count += 1
+        return match_count
 
 class Backend:
-    def __init__(self,file_object_name):
-        #function to initialise filename 
-        self.file_object_name="data"
+    def __init__(self,data_file_name = 'data'):
+        #function to initialise the backend object 
+        self.data_file_name = data_file_name
+        self.admin_user_name = 'admin'
+        self.admin_password = 'password'
+
+        try:
+            open(self.data_file_name,'rb')
+        except FileNotFoundError:
+            print("Data file does not exist. Creating a blank file")
+            with open(self.data_file_name,'wb') as f:
+                pickle.dump([],f)
+        finally:
+            print("Backend initialization complete")
+
     def add_course(self,course_id,interest_list,course_description):
         #function to add a new course to the binary final that stores all courses
-        #data=open("data.txt","x")
-        with open("data.txt",'a+') as data:
-            new_course = Course(course_id,interest_list,course_description)
-            pickle.dump(new_course,data)
+        success, error_message = True, ""
+
+        final_interest_list = []        
+        for i in interest_list:
+            if i is not None:
+                final_interest_list.append(i)
+
+        new_course = Course(course_id,final_interest_list,course_description)
+        
+        course_list = None
+        with open(self.data_file_name,'rb') as file_obj:
+            course_list =pickle.load(file_obj)
+
+        flag = True
+        for existing_course in course_list:
+            if existing_course == new_course:
+                flag = False
+                success = False
+                error_message = "Course '%s' already exists"%(existing_course.course_id)
+                break
+
+        if flag == True:
+            course_list.append(new_course)
+            with open(self.data_file_name,'wb') as file_obj:
+                pickle.dump(course_list,file_obj)
+
+        return (success,error_message)
+             
     def remove_course(self,course_id):
         #function to remove a new course to the binary final that stores all courses
-        #pref_list=list(unpickle_database("data.txt"))
-        for i in pref_list:
-            if i.course_id == self.course_id:
-                pref_list.remove(i)
+        success, error_message = True, ""
+
+        course_to_remove = Course(course_id)
+
+        course_list = None
+        with open(self.data_file_name, 'rb') as file_obj:
+            course_list = pickle.load(file_obj)
+            
+        try:
+            course_list.remove(course_to_remove)
+        except ValueError:
+            success = False
+            error_message = "Course '%s' does not exist"%(course_to_remove.course_id)
+
+        with open(self.data_file_name, 'wb') as file_obj:
+            pickle.dump(course_list, file_obj)
+
+        return (success, error_message)
 
     def check_creds(self,username,password):
         #function to check the credentials while logging in to the admin account
-        if username=="admin" and password=="password":
+        if username==self.admin_user_name and password==self.admin_password:
             return True
-    def pick_course(self,):
-        #function to pick courses based on preference list
-        pass
+        else:
+            return False
+
+    def pick_course(self,student_preference_list):
+        #function to return top three courses based on student preference list
+        course_list = []
+        with open(self.data_file_name,'rb') as file_obj:
+            course_list = pickle.load(file_obj)
+
+        max_courses_to_pick = 3
+        if max_courses_to_pick > len(course_list):
+            max_courses_to_pick = len(course_list)
+
+        sorted_course_list = sorted(course_list, key= lambda x: x.compare_list(student_preference_list), reverse=True)
+
+        picked_courses = []
+        for i in range(max_courses_to_pick):
+            picked_courses.append((sorted_course_list[i],sorted_course_list[i].compare_list(student_preference_list)))
+
+        return picked_courses
