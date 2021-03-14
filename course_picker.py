@@ -6,7 +6,7 @@ class Course:
         self.interest_list=interest_list
         self.course_description=course_description
 
-        assert list(filter(lambda x: x is None,self.interest_list)) == [], "Cannot have None objects in course interest list"
+        # assert list(filter(lambda x: x != '',self.interest_list)) == [], "Cannot have empty objects in course interest list"
 
     def __eq__(self,course_obj):
         return self.course_id == course_obj.course_id
@@ -27,7 +27,11 @@ class Backend:
         self.admin_password = 'password'
 
         try:
-            open(self.data_file_name,'rb')
+            f = open(self.data_file_name,'rb')
+            course_list = pickle.load(f)
+            f.close()
+            for course in course_list:
+                print("%s. Interests: %s"%(course.course_id,course.interest_list))
         except FileNotFoundError:
             print("Data file does not exist. Creating a blank file")
             with open(self.data_file_name,'wb') as f:
@@ -39,10 +43,15 @@ class Backend:
         #function to add a new course to the binary final that stores all courses
         success, error_message = True, ""
 
+        course_id = course_id.lower()
+
         final_interest_list = []        
         for i in interest_list:
-            if i is not None:
+            if i != '':
                 final_interest_list.append(i)
+
+        if final_interest_list == []:
+            return False, "Empty interest list"
 
         new_course = Course(course_id,final_interest_list,course_description)
         
@@ -68,6 +77,8 @@ class Backend:
     def remove_course(self,course_id):
         #function to remove a new course to the binary final that stores all courses
         success, error_message = True, ""
+
+        course_id = course_id.lower()
 
         course_to_remove = Course(course_id)
 
@@ -110,3 +121,16 @@ class Backend:
             picked_courses.append((sorted_course_list[i],sorted_course_list[i].compare_list(student_preference_list)))
 
         return picked_courses
+
+    def get_interest_list(self):
+        course_list = []
+        with open(self.data_file_name, 'rb') as file_obj:
+            course_list = pickle.load(file_obj)
+        
+        unique_interests = set()
+        for course in course_list:
+            for interest in course.interest_list:
+                unique_interests.add(interest.lower())
+        
+        return list(unique_interests)
+
